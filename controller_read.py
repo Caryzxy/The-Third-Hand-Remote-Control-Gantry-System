@@ -1,11 +1,10 @@
 import serial
-import threading
 import time
 
-#This class is the serial reading system that once initiated, will continously record the most recent
-#average reading of the sensors and get ready to be access by other systems
+# This class provides a real-time average reading system that, when called,
+# parses the latest line for the current average reading.
 class RealTimeAverageReader:
-    def __init__(self, port='COM3', baudrate=9600):
+    def __init__(self, port='COM3', baudrate=115200):
         """
         Initialize the real-time average reader.
         
@@ -13,65 +12,100 @@ class RealTimeAverageReader:
             port (str): Serial port of the ESP32.
             baudrate (int): Baud rate for the serial connection.
         """
-        self.serial_port = serial.Serial(port, baudrate)
+        self.serial_port = serial.Serial(port, baudrate, timeout=1)
         time.sleep(2)  # Give time for the serial connection to establish
-        self.latest_reading = None
-        self.latest_weight_kg = None
-        self.running = True
 
-        # Start the background thread
-        self.thread = threading.Thread(target=self._read_serial)
-        self.thread.start()
+    def get_latest_reading(self):
+        """
+        Reads the most recent line from the serial port and parses the average reading.
+        
+        Returns:
+            tuple: The latest average reading value and calculated weight in kg,
+                   or (None, None) if no valid reading is available.
+        """
+        # Flush any initial stale data from the buffer
+        self.serial_port.reset_input_buffer()
 
-    def _read_serial(self):
-        """Continuously read from the serial port and update the latest reading."""
-        while self.running:
+        start_time = time.time()
+        while time.time() - start_time < 2:  # Try for up to 2 seconds
             if self.serial_port.in_waiting > 0:
-                # Read a line from the serial port and handle decoding errors
                 line = self.serial_port.readline().decode('utf-8', errors='ignore').strip()
 
-                # Check if the line contains "Average Reading"
-                if line.startswith("Average Reading:"):
+                # Check if the line contains "Current Average"
+                if "Average Reading: " in line:
                     try:
-                        # Extract the value
-                        average_reading = int(line.split(":")[1].strip())
+                        # Extract the value after "Current Average:"
+                        average_reading_str = line.split("Average Reading: ")[1].strip()
+                        
+                        # Convert extracted string to an integer
+                        average_reading = int(average_reading_str)
 
                         # Convert the reading to kg
                         weight_kg = (4095 - average_reading) * (2 / 4095)
 
-                        # Update the latest reading and weight
-                        self.latest_reading = average_reading
-                        self.latest_weight_kg = weight_kg
-                    except ValueError:
-                        print("Error parsing the average reading value.")
-
-    def get_latest_reading(self):
-        """
-        Returns the most recent average reading and its equivalent in kg.
-        
-        Returns:
-            tuple: The latest average reading value and calculated weight in kg.
-        """
-        return self.latest_reading, self.latest_weight_kg
+                        return average_reading, weight_kg
+                    except (ValueError, IndexError) as e:
+                        print(f"Error parsing the average reading value: {e}")
+                        print(f"Debug: Could not parse '{average_reading_str}' as integer.")
+            time.sleep(0.1)  # Short delay to avoid excessive looping
+        return None, None
 
     def stop(self):
-        """Stops the background thread and closes the serial connection."""
-        self.running = False
-        self.thread.join()
+        """Closes the serial connection."""
         self.serial_port.close()
 
 # Example usage
 
-#initate the serial readtime reader system
-reader = RealTimeAverageReader(port='COM3', baudrate=9600)
+# Initiate the serial real-time reader system
+reader = RealTimeAverageReader(port='COM3', baudrate=115200)
 
-# In a real application, you would call this repeatedly or at specific intervals
-time.sleep(5)  # Wait a bit to allow some readings to accumulate
+# Allow some time for initial readings
+time.sleep(2)
 
-#After initiated, call .get_latest_reading to get the lastest average reading from the sensor
+# Call .get_latest_reading to get the latest average reading from the sensor
 latest_reading, latest_weight_kg = reader.get_latest_reading()
-print(f"Latest Average Reading: {latest_reading} | Approximate Weight: {latest_weight_kg:.3f} kg")
+if latest_reading is not None:
+    print(f"Latest Average Reading: {latest_reading} | Approximate Weight: {latest_weight_kg:.3f} kg")
+else:
+    print("No data available yet.")
+
+time.sleep(0.1)
+
+# Call .get_latest_reading to get the latest average reading from the sensor
+latest_reading, latest_weight_kg = reader.get_latest_reading()
+if latest_reading is not None:
+    print(f"Latest Average Reading: {latest_reading} | Approximate Weight: {latest_weight_kg:.3f} kg")
+else:
+    print("No data available yet.")
+
+time.sleep(0.1)
+
+# Call .get_latest_reading to get the latest average reading from the sensor
+latest_reading, latest_weight_kg = reader.get_latest_reading()
+if latest_reading is not None:
+    print(f"Latest Average Reading: {latest_reading} | Approximate Weight: {latest_weight_kg:.3f} kg")
+else:
+    print("No data available yet.")
+
+time.sleep(0.1)
+
+# Call .get_latest_reading to get the latest average reading from the sensor
+latest_reading, latest_weight_kg = reader.get_latest_reading()
+if latest_reading is not None:
+    print(f"Latest Average Reading: {latest_reading} | Approximate Weight: {latest_weight_kg:.3f} kg")
+else:
+    print("No data available yet.")
 
 
-# Stop the reader when done, this will kil the serial process, only call it when everything was done.
+time.sleep(0.1)
+
+# Call .get_latest_reading to get the latest average reading from the sensor
+latest_reading, latest_weight_kg = reader.get_latest_reading()
+if latest_reading is not None:
+    print(f"Latest Average Reading: {latest_reading} | Approximate Weight: {latest_weight_kg:.3f} kg")
+else:
+    print("No data available yet.")
+
+# Stop the reader when done
+
 reader.stop()
